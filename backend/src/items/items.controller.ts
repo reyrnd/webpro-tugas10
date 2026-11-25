@@ -12,6 +12,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
   JwtAuthGuard,
   type AuthenticatedRequest,
 } from '../auth/jwt-auth.guard.js';
@@ -19,11 +26,16 @@ import { CreateItemDto } from './dto/create-item.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
 import { ItemsService } from './items.service.js';
 
+@ApiTags('2. Inventaris Barang Lab (CRUD)')
+@ApiBearerAuth('jwt')
 @UseGuards(JwtAuthGuard)
 @Controller('items')
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
 
+  @ApiOperation({
+    summary: 'CREATE — Simpan barang baru ke inventaris lab',
+  })
   @Post()
   async create(
     @Body() dto: CreateItemDto,
@@ -37,6 +49,20 @@ export class ItemsController {
     };
   }
 
+  @ApiOperation({
+    summary: 'READ ALL — Ambil daftar barang (otomatis sesuai divisi untuk ANGGOTA, semua divisi untuk PENGURUS)',
+  })
+  @ApiQuery({
+    name: 'division',
+    required: false,
+    enum: ['AUV', 'ROV', 'KRSTI', 'KKI'],
+    description: 'Filter berdasarkan divisi (khusus PENGURUS)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Kata kunci pencarian (nama barang, tempat/lemari, nama anggota, atau catatan)',
+  })
   @Get()
   async findAll(
     @Req() req: AuthenticatedRequest,
@@ -51,6 +77,9 @@ export class ItemsController {
     };
   }
 
+  @ApiOperation({
+    summary: 'STATS (Query Lanjutan) — Statistik jumlah barang total dan per divisi (count & groupBy)',
+  })
   @Get('stats')
   async getStats(@Req() req: AuthenticatedRequest) {
     const data = await this.itemsService.getStats(req.user);
@@ -61,6 +90,14 @@ export class ItemsController {
     };
   }
 
+  @ApiOperation({
+    summary: 'READ ONE — Ambil detail 1 barang berdasarkan UUID',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID barang lab',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @Get(':id')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
@@ -74,6 +111,14 @@ export class ItemsController {
     };
   }
 
+  @ApiOperation({
+    summary: 'UPDATE — Perbarui data barang (misal pindah lemari atau update catatan)',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID barang lab',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @Patch(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -88,6 +133,14 @@ export class ItemsController {
     };
   }
 
+  @ApiOperation({
+    summary: 'DELETE — Hapus barang dari inventaris lab berdasarkan UUID',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID barang lab',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @Delete(':id')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
