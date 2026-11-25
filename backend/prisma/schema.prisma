@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Division {
+  AUV
+  ROV
+  KRSTI
+  KKI
+}
+
+enum Role {
+  ANGGOTA
+  PENGURUS
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  username     String    @unique @db.VarChar(50)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  fullName     String    @map("full_name") @db.VarChar(100)
+  division     Division
+  role         Role      @default(ANGGOTA)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  items        LabItem[]
+
+  @@map("users")
+}
+
+model LabItem {
+  id            String   @id @default(uuid()) @db.Uuid
+  itemName      String   @map("item_name") @db.VarChar(120)
+  storagePlace  String   @map("storage_place") @db.VarChar(100)
+  memberName    String   @map("member_name") @db.VarChar(100)
+  division      Division
+  note          String   @db.Text
+  evidenceImage String?  @map("evidence_image") @db.Text
+  location      String   @db.VarChar(200)
+  storedAt      DateTime @default(now()) @map("stored_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("lab_items")
+}
