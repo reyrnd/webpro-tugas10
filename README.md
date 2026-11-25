@@ -42,4 +42,19 @@ npm run dev
 Frontend berjalan di `http://localhost:3000`.
 
 ## Dokumentasi Screenshot
-Simpan screenshot setiap tahapan (migrasi Prisma, tabel `lab_items` di pgAdmin, pengujian CRUD & `/items/stats` di Postman, serta tampilan Frontend **Desktop** & **Mobile**) di dalam folder `docs/screenshots/` lalu tautkan pada bagian ini.
+Tabel
+<img width="277" height="540" alt="image" src="https://github.com/user-attachments/assets/930cebd2-32a6-4b8f-8971-52cbe2fb36cc" />
+
+Tampilan Frontend Desktop
+<img width="1280" height="617" alt="image" src="https://github.com/user-attachments/assets/0e4b7f15-2a00-4fd3-b7fd-547a753649c2" />
+<img width="1280" height="618" alt="image" src="https://github.com/user-attachments/assets/2c0e42dd-10ae-4d4f-919d-0bc8231152ff" />
+<img width="1280" height="616" alt="image" src="https://github.com/user-attachments/assets/2b1344e3-5140-4afd-90b2-40a74b80bfb2" />
+
+Tampilan Frontend Mobile
+<img width="260" height="523" alt="image" src="https://github.com/user-attachments/assets/abe27589-15d7-44fb-8d88-88f8ee33eb95" />
+<img width="257" height="530" alt="image" src="https://github.com/user-attachments/assets/b8379af1-8c07-411f-b418-b829a4cfaf19" />
+<img width="263" height="531" alt="image" src="https://github.com/user-attachments/assets/8be97860-0748-48d5-824e-aaa3a2afda6a" />
+
+
+
+
