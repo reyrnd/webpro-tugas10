@@ -11,7 +11,7 @@ Proyek ini terpisah menjadi dua folder utama:
 - `backend/` — REST API menggunakan **NestJS**, **Prisma ORM**, dan **PostgreSQL** (`tugas_9_db`).
 - `frontend/` — Antarmuka web responsif (Desktop & Mobile) menggunakan **React**, **Vite**, dan **Tailwind CSS**.
 
-## Daftar Endpoint API (`http://localhost:3000`)
+## Daftar Endpoint API (`http://localhost:3001`)
 
 | Method | Endpoint | Deskripsi |
 | :--- | :--- | :--- |
@@ -31,7 +31,7 @@ npm install
 npx prisma migrate dev
 npm run start:dev
 ```
-Backend berjalan di `http://localhost:3000`.
+Backend berjalan di `http://localhost:3001`.
 
 ### 2. Menjalankan Frontend (React + Vite + Tailwind)
 ```bash
@@ -39,7 +39,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Frontend berjalan di `http://localhost:5173`.
+Frontend berjalan di `http://localhost:3000`.
 
 ## Dokumentasi Screenshot
 Simpan screenshot setiap tahapan (migrasi Prisma, tabel `lab_items` di pgAdmin, pengujian CRUD & `/items/stats` di Postman, serta tampilan Frontend **Desktop** & **Mobile**) di dalam folder `docs/screenshots/` lalu tautkan pada bagian ini.

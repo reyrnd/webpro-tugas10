@@ -13,10 +13,11 @@ import {
   Shield,
   Trash2,
   User,
+  Users,
   X,
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const DIVISIONS = ['AUV', 'ROV', 'KRSTI', 'KKI'];
 const TOKEN_KEY = 'lab_robotik_token';
 const USER_KEY = 'lab_robotik_user';
@@ -89,7 +90,6 @@ function AuthScreen({ onAuthSuccess }) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [division, setDivision] = useState('AUV');
-  const [role, setRole] = useState('ANGGOTA');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -108,7 +108,6 @@ function AuthScreen({ onAuthSuccess }) {
               password,
               fullName: fullName.trim(),
               division,
-              role,
             };
 
       const res = await fetch(`${API_URL}${endpoint}`, {
@@ -129,7 +128,7 @@ function AuthScreen({ onAuthSuccess }) {
     } catch (err) {
       setError(
         err.message === 'Failed to fetch'
-          ? 'Gagal terhubung ke server backend (pastikan backend berjalan di port 3000).'
+          ? 'Gagal terhubung ke server backend (pastikan backend berjalan di port 3001).'
           : err.message,
       );
     } finally {
@@ -153,7 +152,6 @@ function AuthScreen({ onAuthSuccess }) {
         </div>
 
         <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-xs">
-          {/* Tab Switch */}
           <div className="mb-5 grid grid-cols-2 rounded-lg bg-stone-100 p-1">
             <button
               type="button"
@@ -181,7 +179,7 @@ function AuthScreen({ onAuthSuccess }) {
                   : 'text-stone-500 hover:text-stone-800'
               }`}
             >
-              Daftar Akun
+              Daftar Anggota
             </button>
           </div>
 
@@ -238,45 +236,26 @@ function AuthScreen({ onAuthSuccess }) {
             </div>
 
             {mode === 'register' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-700">
-                    Divisi Robotik
-                  </label>
-                  <select
-                    value={division}
-                    onChange={(e) => setDivision(e.target.value)}
-                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-red-600 focus:outline-none"
-                  >
-                    {DIVISIONS.map((div) => (
-                      <option key={div} value={div}>
-                        {div}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-700">
-                    Role
-                  </label>
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-red-600 focus:outline-none"
-                  >
-                    <option value="ANGGOTA">Anggota</option>
-                    <option value="PENGURUS">Pengurus</option>
-                  </select>
-                </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-stone-700">
+                  Divisi Robotik
+                </label>
+                <select
+                  value={division}
+                  onChange={(e) => setDivision(e.target.value)}
+                  className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-red-600 focus:outline-none"
+                >
+                  {DIVISIONS.map((div) => (
+                    <option key={div} value={div}>
+                      Divisi {div}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-stone-500">
+                  Akun baru otomatis terdaftar sebagai <strong>Anggota</strong>. Perubahan role menjadi{' '}
+                  <strong>Pengurus</strong> hanya dapat dilakukan oleh Pengurus.
+                </p>
               </div>
-            )}
-
-            {mode === 'register' && (
-              <p className="text-[11px] leading-relaxed text-stone-500">
-                <strong>Anggota</strong> hanya melihat barang divisinya sendiri.{' '}
-                <strong>Pengurus</strong> dapat melihat dan mengelola barang semua divisi.
-              </p>
             )}
 
             <button
@@ -309,7 +288,9 @@ export default function App() {
     }
   });
 
+  const [activeTab, setActiveTab] = useState('items'); // 'items' | 'members'
   const [items, setItems] = useState([]);
+  const [members, setMembers] = useState([]);
   const [stats, setStats] = useState({
     scope: 'ALL',
     totalItems: 0,
@@ -318,6 +299,8 @@ export default function App() {
   const [selectedDivision, setSelectedDivision] = useState('ALL');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [updatingRoleId, setUpdatingRoleId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [detectingLoc, setDetectingLoc] = useState(false);
   const [error, setError] = useState('');
@@ -335,6 +318,7 @@ export default function App() {
     localStorage.setItem(USER_KEY, JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    setActiveTab('items');
     setSelectedDivision(newUser.role === 'PENGURUS' ? 'ALL' : newUser.division);
     setForm({ ...EMPTY_FORM, division: newUser.division });
   };
@@ -345,6 +329,8 @@ export default function App() {
     setToken('');
     setUser(null);
     setItems([]);
+    setMembers([]);
+    setActiveTab('items');
     setEditingId(null);
     setForm(EMPTY_FORM);
   }, []);
@@ -383,7 +369,7 @@ export default function App() {
     } catch (err) {
       setError(
         err.message === 'Failed to fetch'
-          ? 'Gagal terhubung ke server backend (pastikan backend NestJS berjalan di port 3000).'
+          ? 'Gagal terhubung ke server backend (pastikan backend NestJS berjalan di port 3001).'
           : err.message,
       );
     } finally {
@@ -391,17 +377,73 @@ export default function App() {
     }
   }, [token, user, isPengurus, selectedDivision, search, handleLogout]);
 
+  const fetchMembers = useCallback(async () => {
+    if (!token || !isPengurus) return;
+    setLoadingMembers(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        handleLogout();
+        return;
+      }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Gagal memuat daftar anggota');
+      setMembers(json.data || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, [token, isPengurus, handleLogout]);
+
   useEffect(() => {
     if (!token || !user) return;
-    const timer = setTimeout(() => {
-      fetchData();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [fetchData, token, user]);
+    if (activeTab === 'items') {
+      const timer = setTimeout(() => {
+        fetchData();
+      }, 150);
+      return () => clearTimeout(timer);
+    } else if (activeTab === 'members' && isPengurus) {
+      fetchMembers();
+    }
+  }, [fetchData, fetchMembers, token, user, activeTab, isPengurus]);
 
   if (!token || !user) {
     return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
   }
+
+  const handleToggleRole = async (member) => {
+    const nextRole = member.role === 'PENGURUS' ? 'ANGGOTA' : 'PENGURUS';
+    const ok = window.confirm(
+      `Ubah role "${member.fullName}" (@${member.username}) menjadi ${nextRole}?`,
+    );
+    if (!ok) return;
+
+    setUpdatingRoleId(member.id);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`${API_URL}/auth/users/${member.id}/role`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role: nextRole }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Gagal mengubah role');
+      setSuccessMsg(`Role "${member.fullName}" berhasil diubah menjadi ${nextRole}.`);
+      await fetchMembers();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
@@ -560,7 +602,35 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 sm:flex">
+            {isPengurus && (
+              <div className="flex rounded-lg border border-stone-200 bg-stone-50 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('items')}
+                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                    activeTab === 'items'
+                      ? 'bg-white text-stone-900 shadow-xs'
+                      : 'text-stone-500 hover:text-stone-800'
+                  }`}
+                >
+                  Barang
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('members')}
+                  className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition ${
+                    activeTab === 'members'
+                      ? 'bg-white text-red-700 shadow-xs'
+                      : 'text-stone-500 hover:text-stone-800'
+                  }`}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Kelola Anggota</span>
+                </button>
+              </div>
+            )}
+
+            <div className="hidden items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 md:flex">
               {isPengurus ? (
                 <Shield className="h-3.5 w-3.5 text-red-600" />
               ) : (
@@ -572,14 +642,15 @@ export default function App() {
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowFormMobile((prev) => !prev)}
-              className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700 lg:hidden"
-            >
-              {showFormMobile ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              <span className="hidden xs:inline">{showFormMobile ? 'Tutup' : 'Tambah'}</span>
-            </button>
+            {activeTab === 'items' && (
+              <button
+                type="button"
+                onClick={() => setShowFormMobile((prev) => !prev)}
+                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700 lg:hidden"
+              >
+                {showFormMobile ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              </button>
+            )}
 
             <button
               type="button"
@@ -595,73 +666,6 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        {/* Statistik */}
-        <section
-          className={`mb-6 grid gap-3 ${
-            isPengurus ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2'
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => isPengurus && setSelectedDivision('ALL')}
-            className={`rounded-xl border p-4 text-left transition ${
-              isPengurus ? 'col-span-2 sm:col-span-1' : ''
-            } ${
-              !isPengurus || selectedDivision === 'ALL'
-                ? 'border-red-600 bg-white ring-1 ring-red-600'
-                : 'border-stone-200 bg-white hover:border-stone-300'
-            }`}
-          >
-            <p className="text-xs font-medium text-stone-500">
-              {isPengurus ? 'Total Semua Divisi' : `Total Barang Divisi ${user.division}`}
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-stone-900">{stats.totalItems}</p>
-          </button>
-
-          {isPengurus ? (
-            stats.byDivision.map((d) => {
-              const active = selectedDivision === d.division;
-              return (
-                <button
-                  key={d.division}
-                  type="button"
-                  onClick={() =>
-                    setSelectedDivision((prev) => (prev === d.division ? 'ALL' : d.division))
-                  }
-                  className={`rounded-xl border p-4 text-left transition ${
-                    active
-                      ? 'border-red-600 bg-red-50/40 ring-1 ring-red-600'
-                      : 'border-stone-200 bg-white hover:border-stone-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-xs font-semibold tracking-wide ${
-                        active ? 'text-red-700' : 'text-stone-500'
-                      }`}
-                    >
-                      {d.division}
-                    </span>
-                    {active && <span className="h-2 w-2 rounded-full bg-red-600" />}
-                  </div>
-                  <p className="mt-1 text-2xl font-semibold text-stone-900">{d.count}</p>
-                </button>
-              );
-            })
-          ) : (
-            <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4">
-              <div>
-                <p className="text-xs font-medium text-stone-500">Akun Aktif</p>
-                <p className="mt-1 text-sm font-semibold text-stone-900">{user.fullName}</p>
-                <p className="text-xs text-stone-500">@{user.username}</p>
-              </div>
-              <span className="rounded-lg bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
-                Divisi {user.division}
-              </span>
-            </div>
-          )}
-        </section>
-
         {/* Notifikasi */}
         {error && (
           <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -686,306 +690,455 @@ export default function App() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Form Input */}
-          <section className={`lg:col-span-4 ${showFormMobile ? 'block' : 'hidden lg:block'}`}>
-            <div className="sticky top-20 rounded-xl border border-stone-200 bg-white p-5">
-              <div className="mb-4 flex items-center justify-between border-b border-stone-100 pb-3">
-                <h2 className="text-sm font-semibold text-stone-900">
-                  {editingId ? 'Edit Data Barang' : 'Catat Penyimpanan Barang'}
-                </h2>
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="text-xs font-medium text-stone-500 hover:text-red-600"
-                  >
-                    Batal
-                  </button>
-                )}
+        {/* PANEL KELOLA ANGGOTA (KHUSUS PENGURUS) */}
+        {activeTab === 'members' && isPengurus ? (
+          <section className="rounded-xl border border-stone-200 bg-white">
+            <div className="border-b border-stone-100 px-5 py-4">
+              <h2 className="text-sm font-semibold text-stone-900">
+                Manajemen Role Anggota Lab
+              </h2>
+              <p className="mt-0.5 text-xs text-stone-500">
+                Hanya Pengurus yang dapat menaikkan Anggota menjadi Pengurus atau sebaliknya.
+              </p>
+            </div>
+
+            {loadingMembers ? (
+              <div className="p-8 text-center text-sm text-stone-500">
+                Memuat daftar anggota...
               </div>
-
-              <form onSubmit={handleSubmit} className="space-y-3.5">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-700">
-                    Nama Barang
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Baterai LiPo 4S 5200mAh"
-                    value={form.itemName}
-                    onChange={(e) => setForm({ ...form, itemName: e.target.value })}
-                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-700">
-                    Tempat Penyimpanan
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Lemari A, Rak 2"
-                    value={form.storagePlace}
-                    onChange={(e) => setForm({ ...form, storagePlace: e.target.value })}
-                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
-                  />
-                </div>
-
-                {isPengurus ? (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-700">
-                      Divisi Tujuan
-                    </label>
-                    <select
-                      value={form.division}
-                      onChange={(e) => setForm({ ...form, division: e.target.value })}
-                      className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-red-600 focus:outline-none"
+            ) : (
+              <div className="divide-y divide-stone-100">
+                {members.map((m) => {
+                  const isSelf = m.id === user.id;
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      {DIVISIONS.map((div) => (
-                        <option key={div} value={div}>
-                          {div}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600">
-                    Disimpan oleh <strong className="text-stone-900">{user.fullName}</strong> ·
-                    Divisi <strong className="text-red-700">{user.division}</strong>
-                  </div>
-                )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-stone-900">
+                            {m.fullName}
+                          </span>
+                          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
+                            {m.division}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                              m.role === 'PENGURUS'
+                                ? 'bg-red-50 text-red-700'
+                                : 'bg-stone-100 text-stone-600'
+                            }`}
+                          >
+                            {m.role}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-stone-500">
+                          @{m.username} · UUID: <span className="font-mono text-[11px]">{m.id}</span>
+                        </p>
+                      </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-700">
-                    Lokasi
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ruangan lab / koordinat"
-                      value={form.location}
-                      onChange={(e) => setForm({ ...form, location: e.target.value })}
-                      className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
-                    />
+                      <div>
+                        {isSelf ? (
+                          <span className="text-xs text-stone-400">Akun aktif Anda</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={updatingRoleId === m.id}
+                            onClick={() => handleToggleRole(m)}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                              m.role === 'PENGURUS'
+                                ? 'border border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+                                : 'bg-red-600 text-white hover:bg-red-700'
+                            }`}
+                          >
+                            {updatingRoleId === m.id
+                              ? 'Menyimpan...'
+                              : m.role === 'PENGURUS'
+                                ? 'Jadikan Anggota'
+                                : 'Jadikan Pengurus'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : (
+          <>
+            {/* Statistik */}
+            <section
+              className={`mb-6 grid gap-3 ${
+                isPengurus ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => isPengurus && setSelectedDivision('ALL')}
+                className={`rounded-xl border p-4 text-left transition ${
+                  isPengurus ? 'col-span-2 sm:col-span-1' : ''
+                } ${
+                  !isPengurus || selectedDivision === 'ALL'
+                    ? 'border-red-600 bg-white ring-1 ring-red-600'
+                    : 'border-stone-200 bg-white hover:border-stone-300'
+                }`}
+              >
+                <p className="text-xs font-medium text-stone-500">
+                  {isPengurus ? 'Total Semua Divisi' : `Total Barang Divisi ${user.division}`}
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-stone-900">{stats.totalItems}</p>
+              </button>
+
+              {isPengurus ? (
+                stats.byDivision.map((d) => {
+                  const active = selectedDivision === d.division;
+                  return (
                     <button
+                      key={d.division}
                       type="button"
-                      onClick={handleDetectLocation}
-                      disabled={detectingLoc}
-                      title="Deteksi GPS otomatis"
-                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-stone-300 bg-stone-50 px-3 text-xs font-medium text-stone-700 transition hover:border-red-600 hover:text-red-600 disabled:opacity-50"
+                      onClick={() =>
+                        setSelectedDivision((prev) => (prev === d.division ? 'ALL' : d.division))
+                      }
+                      className={`rounded-xl border p-4 text-left transition ${
+                        active
+                          ? 'border-red-600 bg-red-50/40 ring-1 ring-red-600'
+                          : 'border-stone-200 bg-white hover:border-stone-300'
+                      }`}
                     >
-                      <Navigation className="h-3.5 w-3.5" />
-                      {detectingLoc ? '...' : 'GPS'}
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-xs font-semibold tracking-wide ${
+                            active ? 'text-red-700' : 'text-stone-500'
+                          }`}
+                        >
+                          {d.division}
+                        </span>
+                        {active && <span className="h-2 w-2 rounded-full bg-red-600" />}
+                      </div>
+                      <p className="mt-1 text-2xl font-semibold text-stone-900">{d.count}</p>
                     </button>
+                  );
+                })
+              ) : (
+                <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4">
+                  <div>
+                    <p className="text-xs font-medium text-stone-500">Akun Aktif</p>
+                    <p className="mt-1 text-sm font-semibold text-stone-900">{user.fullName}</p>
+                    <p className="text-xs text-stone-500">@{user.username}</p>
                   </div>
+                  <span className="rounded-lg bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                    Divisi {user.division}
+                  </span>
                 </div>
+              )}
+            </section>
 
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-700">
-                    Catatan (Note)
-                  </label>
-                  <textarea
-                    rows={3}
-                    required
-                    placeholder="Keterangan kondisi atau posisi barang agar anggota lain tidak bingung..."
-                    value={form.note}
-                    onChange={(e) => setForm({ ...form, note: e.target.value })}
-                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-700">
-                    Foto Evidence (Stempel Jam & Lokasi)
-                  </label>
-                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50/70 px-4 py-4 text-center transition hover:border-red-500 hover:bg-red-50/30">
-                    <Camera className="mb-1 h-5 w-5 text-red-600" />
-                    <span className="text-xs font-medium text-stone-700">
-                      Ambil Foto atau Pilih Gambar
-                    </span>
-                    <span className="mt-0.5 text-[11px] text-stone-400">
-                      Otomatis tercatat jam & lokasi penyimpanan
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleImageChange}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {form.evidenceImage && (
-                    <div className="relative mt-2.5 overflow-hidden rounded-lg border border-stone-200">
-                      <img
-                        src={form.evidenceImage}
-                        alt="Preview Evidence"
-                        className="max-h-44 w-full object-cover"
-                      />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              {/* Form Input */}
+              <section className={`lg:col-span-4 ${showFormMobile ? 'block' : 'hidden lg:block'}`}>
+                <div className="sticky top-20 rounded-xl border border-stone-200 bg-white p-5">
+                  <div className="mb-4 flex items-center justify-between border-b border-stone-100 pb-3">
+                    <h2 className="text-sm font-semibold text-stone-900">
+                      {editingId ? 'Edit Data Barang' : 'Catat Penyimpanan Barang'}
+                    </h2>
+                    {editingId && (
                       <button
                         type="button"
-                        onClick={() => setForm({ ...form, evidenceImage: '' })}
-                        className="absolute top-2 right-2 rounded-md bg-white/90 p-1 text-stone-700 shadow hover:bg-red-600 hover:text-white"
+                        onClick={handleCancelEdit}
+                        className="text-xs font-medium text-stone-500 hover:text-red-600"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        Batal
                       </button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSubmit} className="space-y-3.5">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-stone-700">
+                        Nama Barang
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Contoh: Baterai LiPo 4S 5200mAh"
+                        value={form.itemName}
+                        onChange={(e) => setForm({ ...form, itemName: e.target.value })}
+                        className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-stone-700">
+                        Tempat Penyimpanan
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Contoh: Lemari A, Rak 2"
+                        value={form.storagePlace}
+                        onChange={(e) => setForm({ ...form, storagePlace: e.target.value })}
+                        className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
+                      />
+                    </div>
+
+                    {isPengurus ? (
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-stone-700">
+                          Divisi Tujuan
+                        </label>
+                        <select
+                          value={form.division}
+                          onChange={(e) => setForm({ ...form, division: e.target.value })}
+                          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-red-600 focus:outline-none"
+                        >
+                          {DIVISIONS.map((div) => (
+                            <option key={div} value={div}>
+                              {div}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                        Disimpan oleh <strong className="text-stone-900">{user.fullName}</strong> ·
+                        Divisi <strong className="text-red-700">{user.division}</strong>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-stone-700">
+                        Lokasi
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ruangan lab / koordinat"
+                          value={form.location}
+                          onChange={(e) => setForm({ ...form, location: e.target.value })}
+                          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleDetectLocation}
+                          disabled={detectingLoc}
+                          title="Deteksi GPS otomatis"
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-stone-300 bg-stone-50 px-3 text-xs font-medium text-stone-700 transition hover:border-red-600 hover:text-red-600 disabled:opacity-50"
+                        >
+                          <Navigation className="h-3.5 w-3.5" />
+                          {detectingLoc ? '...' : 'GPS'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-stone-700">
+                        Catatan (Note)
+                      </label>
+                      <textarea
+                        rows={3}
+                        required
+                        placeholder="Keterangan kondisi atau posisi barang agar anggota lain tidak bingung..."
+                        value={form.note}
+                        onChange={(e) => setForm({ ...form, note: e.target.value })}
+                        className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-stone-700">
+                        Foto Evidence (Stempel Jam & Lokasi)
+                      </label>
+                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50/70 px-4 py-4 text-center transition hover:border-red-500 hover:bg-red-50/30">
+                        <Camera className="mb-1 h-5 w-5 text-red-600" />
+                        <span className="text-xs font-medium text-stone-700">
+                          Ambil Foto atau Pilih Gambar
+                        </span>
+                        <span className="mt-0.5 text-[11px] text-stone-400">
+                          Otomatis tercatat jam & lokasi penyimpanan
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {form.evidenceImage && (
+                        <div className="relative mt-2.5 overflow-hidden rounded-lg border border-stone-200">
+                          <img
+                            src={form.evidenceImage}
+                            alt="Preview Evidence"
+                            className="max-h-44 w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, evidenceImage: '' })}
+                            className="absolute top-2 right-2 rounded-md bg-white/90 p-1 text-stone-700 shadow hover:bg-red-600 hover:text-white"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+                    >
+                      {submitting
+                        ? 'Menyimpan...'
+                        : editingId
+                          ? 'Simpan Perubahan'
+                          : 'Simpan Barang'}
+                    </button>
+                  </form>
+                </div>
+              </section>
+
+              {/* Daftar Barang */}
+              <section className="lg:col-span-8">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-stone-400" />
+                    <input
+                      type="text"
+                      placeholder="Cari nama barang, lemari, anggota, atau catatan..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full rounded-lg border border-stone-200 bg-white py-2 pr-3 pl-9 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
+                    />
+                  </div>
+
+                  {isPengurus && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {['ALL', ...DIVISIONS].map((div) => (
+                        <button
+                          key={div}
+                          type="button"
+                          onClick={() => setSelectedDivision(div)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                            selectedDivision === div
+                              ? 'bg-red-600 text-white'
+                              : 'border border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-900'
+                          }`}
+                        >
+                          {div === 'ALL' ? 'Semua' : div}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-                >
-                  {submitting
-                    ? 'Menyimpan...'
-                    : editingId
-                      ? 'Simpan Perubahan'
-                      : 'Simpan Barang'}
-                </button>
-              </form>
-            </div>
-          </section>
-
-          {/* Daftar Barang */}
-          <section className="lg:col-span-8">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Cari nama barang, lemari, anggota, atau catatan..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-lg border border-stone-200 bg-white py-2 pr-3 pl-9 text-sm text-stone-900 placeholder-stone-400 focus:border-red-600 focus:outline-none"
-                />
-              </div>
-
-              {isPengurus && (
-                <div className="flex flex-wrap gap-1.5">
-                  {['ALL', ...DIVISIONS].map((div) => (
-                    <button
-                      key={div}
-                      type="button"
-                      onClick={() => setSelectedDivision(div)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                        selectedDivision === div
-                          ? 'bg-red-600 text-white'
-                          : 'border border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-900'
-                      }`}
-                    >
-                      {div === 'ALL' ? 'Semua' : div}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {loading ? (
-              <div className="rounded-xl border border-stone-200 bg-white p-10 text-center text-sm text-stone-500">
-                Memuat data inventaris...
-              </div>
-            ) : items.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-stone-300 bg-white p-10 text-center">
-                <Archive className="mx-auto mb-2.5 h-8 w-8 text-stone-300" />
-                <p className="text-sm font-medium text-stone-700">Belum ada barang tersimpan</p>
-                <p className="mt-1 text-xs text-stone-500">
-                  Catat barang pertama melalui form agar anggota lab lain mudah menemukannya.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {items.map((item) => (
-                  <article
-                    key={item.id}
-                    className="flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:border-stone-300"
-                  >
-                    {item.evidenceImage ? (
-                      <button
-                        type="button"
-                        onClick={() => setPreviewImage(item)}
-                        className="group relative h-44 w-full overflow-hidden border-b border-stone-100 bg-stone-100"
+                {loading ? (
+                  <div className="rounded-xl border border-stone-200 bg-white p-10 text-center text-sm text-stone-500">
+                    Memuat data inventaris...
+                  </div>
+                ) : items.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-stone-300 bg-white p-10 text-center">
+                    <Archive className="mx-auto mb-2.5 h-8 w-8 text-stone-300" />
+                    <p className="text-sm font-medium text-stone-700">Belum ada barang tersimpan</p>
+                    <p className="mt-1 text-xs text-stone-500">
+                      Catat barang pertama melalui form agar anggota lab lain mudah menemukannya.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {items.map((item) => (
+                      <article
+                        key={item.id}
+                        className="flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition hover:border-stone-300"
                       >
-                        <img
-                          src={item.evidenceImage}
-                          alt={item.itemName}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                        />
-                        <span className="absolute top-2.5 left-2.5 rounded-md bg-white/95 px-2.5 py-1 text-xs font-semibold text-stone-900 shadow-xs">
-                          {item.storagePlace}
-                        </span>
-                      </button>
-                    ) : (
-                      <div className="flex items-center justify-between border-b border-stone-100 bg-stone-50 px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-800">
-                          <Archive className="h-3.5 w-3.5 text-red-600" />
-                          {item.storagePlace}
-                        </span>
-                        <span className="text-[11px] text-stone-400">Tanpa foto</span>
-                      </div>
-                    )}
+                        {item.evidenceImage ? (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImage(item)}
+                            className="group relative h-44 w-full overflow-hidden border-b border-stone-100 bg-stone-100"
+                          >
+                            <img
+                              src={item.evidenceImage}
+                              alt={item.itemName}
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                            />
+                            <span className="absolute top-2.5 left-2.5 rounded-md bg-white/95 px-2.5 py-1 text-xs font-semibold text-stone-900 shadow-xs">
+                              {item.storagePlace}
+                            </span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center justify-between border-b border-stone-100 bg-stone-50 px-4 py-3">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-800">
+                              <Archive className="h-3.5 w-3.5 text-red-600" />
+                              {item.storagePlace}
+                            </span>
+                            <span className="text-[11px] text-stone-400">Tanpa foto</span>
+                          </div>
+                        )}
 
-                    <div className="flex flex-1 flex-col p-4">
-                      <div className="mb-2 flex items-start justify-between gap-2">
-                        <h3 className="text-sm font-semibold leading-snug text-stone-900">
-                          {item.itemName}
-                        </h3>
-                        <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                          {item.division}
-                        </span>
-                      </div>
+                        <div className="flex flex-1 flex-col p-4">
+                          <div className="mb-2 flex items-start justify-between gap-2">
+                            <h3 className="text-sm font-semibold leading-snug text-stone-900">
+                              {item.itemName}
+                            </h3>
+                            <span className="shrink-0 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                              {item.division}
+                            </span>
+                          </div>
 
-                      <p className="mb-3 rounded-lg bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-600">
-                        {item.note}
-                      </p>
+                          <p className="mb-3 rounded-lg bg-stone-50 px-3 py-2 text-xs leading-relaxed text-stone-600">
+                            {item.note}
+                          </p>
 
-                      <div className="mt-auto space-y-1.5 border-t border-stone-100 pt-3 text-xs text-stone-500">
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 shrink-0 text-stone-400" />
-                          <span className="truncate">
-                            <strong className="font-medium text-stone-800">{item.memberName}</strong>
-                          </span>
+                          <div className="mt-auto space-y-1.5 border-t border-stone-100 pt-3 text-xs text-stone-500">
+                            <div className="flex items-center gap-2">
+                              <User className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+                              <span className="truncate">
+                                <strong className="font-medium text-stone-800">
+                                  {item.memberName}
+                                </strong>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                              <span className="truncate">{item.location}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+                              <span>{formatDateTime(item.storedAt)}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3.5 flex gap-2 border-t border-stone-100 pt-3">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(item)}
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-white py-1.5 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-50"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(item)}
+                              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Hapus
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 shrink-0 text-red-500" />
-                          <span className="truncate">{item.location}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-3.5 w-3.5 shrink-0 text-stone-400" />
-                          <span>{formatDateTime(item.storedAt)}</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3.5 flex gap-2 border-t border-stone-100 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(item)}
-                          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-stone-200 bg-white py-1.5 text-xs font-medium text-stone-700 transition hover:border-stone-300 hover:bg-stone-50"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item)}
-                          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Hapus
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          </>
+        )}
       </main>
 
       {/* Lightbox Preview Foto */}

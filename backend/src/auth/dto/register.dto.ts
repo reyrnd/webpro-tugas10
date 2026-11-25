@@ -1,7 +1,6 @@
 import {
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -33,8 +32,4 @@ export class RegisterDto {
 
   @IsEnum(DIVISIONS, { message: 'Divisi harus salah satu dari: AUV, ROV, KRSTI, KKI' })
   division: DivisionType;
-
-  @IsOptional()
-  @IsEnum(ROLES, { message: 'Role harus ANGGOTA atau PENGURUS' })
-  role?: RoleType;
 }

@@ -2,6 +2,9 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -9,6 +12,7 @@ import {
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
+import { UpdateRoleDto } from './dto/update-role.dto.js';
 import {
   JwtAuthGuard,
   type AuthenticatedRequest,
@@ -45,6 +49,32 @@ export class AuthController {
     return {
       statusCode: 200,
       message: 'Berhasil mengambil profil pengguna',
+      data,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('users')
+  async listUsers(@Req() req: AuthenticatedRequest) {
+    const data = await this.authService.listUsers(req.user);
+    return {
+      statusCode: 200,
+      message: 'Berhasil mengambil daftar anggota lab',
+      data,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('users/:id/role')
+  async updateUserRole(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateRoleDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const data = await this.authService.updateUserRole(id, dto.role, req.user);
+    return {
+      statusCode: 200,
+      message: 'Role anggota berhasil diperbarui',
       data,
     };
   }
